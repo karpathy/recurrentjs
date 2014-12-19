@@ -149,8 +149,15 @@ var initModel = function() {
   // letter embedding vectors
   var model = {};
   model['Wil'] = new R.RandMat(input_size, letter_size , 0, 0.08);
-  var lstm = R.initLSTM(letter_size, hidden_sizes, output_size);
-  utilAddToModel(model, lstm);
+  
+  if(generator === 'rnn') {
+    var rnn = R.initRNN(letter_size, hidden_sizes, output_size);
+    utilAddToModel(model, rnn);
+  } else {
+    var lstm = R.initLSTM(letter_size, hidden_sizes, output_size);
+    utilAddToModel(model, lstm);
+  }
+
   return model;
 }
 
@@ -158,16 +165,16 @@ var reinit_learning_rate_slider = function() {
   // init learning rate slider for controlling the decay
   // note that learning_rate is a global variable
   $("#lr_slider").slider({
-    min: Math.log10(0.01) - 2.0,
+    min: Math.log10(0.01) - 3.0,
     max: Math.log10(0.01) + 0.05,
     step: 0.05,
     value: Math.log10(learning_rate),
     slide: function( event, ui ) {
       learning_rate = Math.pow(10, ui.value);
-      $("#lr_text").text(learning_rate.toFixed(4));
+      $("#lr_text").text(learning_rate.toFixed(5));
     }
   });
-  $("#lr_text").text(learning_rate.toFixed(4));
+  $("#lr_text").text(learning_rate.toFixed(5));
 }
 
 var reinit = function() {
@@ -241,7 +248,11 @@ var loadModel = function(j) {
 var forwardIndex = function(G, model, ix, prev) {
   var x = G.rowPluck(model['Wil'], ix);
   // forward prop the sequence learner
-  var out_struct = R.forwardLSTM(G, model, hidden_sizes, x, prev);
+  if(generator === 'rnn') {
+    var out_struct = R.forwardRNN(G, model, hidden_sizes, x, prev);
+  } else {
+    var out_struct = R.forwardLSTM(G, model, hidden_sizes, x, prev);
+  }
   return out_struct;
 }
 
@@ -438,7 +449,8 @@ $(function() {
   });
 
   $("#loadpretrained").click(function(){
-    $.getJSON("rnn_100_model.json", function(data) {
+    $.getJSON("lstm_100_model.json", function(data) {
+      pplGraph = new Rvis.Graph();
       learning_rate = 0.0001;
       reinit_learning_rate_slider();
       loadModel(data);
@@ -462,7 +474,6 @@ $(function() {
 });
 
 </script>
-
 </head>
 
 <body>
@@ -472,13 +483,13 @@ $(function() {
 <div id="wrap">
   <h1>Deep Recurrent Nets character generation demo</h1>
   <div id="intro">
-    This demo shows usage of the <a href="https://github.com/karpathy/recurrentjs">recurrentjs library</a> that allows you to train deep Recurrent Neural Networks (RNN) and Long Short-Term Memory Networks (LSTM) in Javascript. The library is actually more general and allows you to set up arbitrary expression graphs and perform automatic backpropagation through symbolic differentiation.<br><br>
+    This demo shows usage of the <a href="https://github.com/karpathy/recurrentjs">recurrentjs library</a> that allows you to train deep Recurrent Neural Networks (RNN) and Long Short-Term Memory Networks (LSTM) in Javascript. But the core of the library is more general and allows you to set up arbitrary expression graphs that support fully automatic backpropagation.<br><br>
 
     In this demo we take a dataset of sentences as input and learn to memorize the sentences character by character. That is, the RNN/LSTM takes a character, its context from previous time steps (as mediated by the hidden layers) and predicts the next character in the sequence. Here is an example: <br><br>
 
     <div style="text-align:center;"><img src="eg.png"></div>
 
-    In the image above, every character has an associated "letter vector" that we will train with backpropgation. These letter vectors are combined through a Matrix Vector multiply transformation into the first hidden layer representation (yellow), then into second hidden layer representation (purple), and finally into the output space (blue). The output space has dimensionality equal to the number of characters in the dataset and every dimension provides the probability of the next character in the sequence. The network is therefore trained to always predict the next character. The quantity we track during training is called the <b>perplexity</b>, which measures how surprised the network is to see the next character in a sequence. For example, if perplexity is 4.0 then it's as if the network was guessing uniformly at random from 4 possible characters for next letter (i.e. lowest it can be is 1). At test time, the prediction is done interatively character by character.<br><br>
+    In the example image above that depicts a deep RNN, every character has an associated "letter vector" that we will train with backpropagation. These letter vectors are combined through a (learnable) Matrix-vector multiply transformation into the first hidden layer representation (yellow), then into second hidden layer representation (purple), and finally into the output space (blue). The output space has dimensionality equal to the number of characters in the dataset and every dimension provides the probability of the next character in the sequence. The network is therefore trained to always predict the next character (using Softmax + cross-entropy loss on all letters). The quantity we track during training is called the <b>perplexity</b>, which measures how surprised the network is to see the next character in a sequence. For example, if perplexity is 4.0 then it's as if the network was guessing uniformly at random from 4 possible characters for next letter (i.e. lowest it can be is 1). At test time, the prediction is currently done iteratively character by character in a greedy fashion, but I might eventually implemented more sophisticated methods (e.g. beam search).<br><br>
 
     The demo is pre-filled with sentences from <a href="http://www.paulgraham.com/articles.html">Paul Graham's essays</a>, in an attempt to encode Paul Graham's knowledge into the weights of the Recurrent Networks. The long-term goal of the project then is to generate startup wisdom at will. Feel free to train on whatever data you wish, and to experiment with the parameters. If you want more impressive models you have to increase the sizes of hidden layers, and maybe slightly the letter vectors. However, this will take longer to train.<br><br>
 
@@ -1940,13 +1951,14 @@ regc = 0.000001; // L2 regularization strength
 learning_rate = 0.01; // learning rate
 clipval = 5.0; // clip gradients at this value
   </textarea><br />
-
+  protip: if your perplexity is exploding with Infinity try lowering the initial learning rate
+  <br>
   <div id="status">
 
     <div>
       <div class="hh">Training stats:</div>
       <div class="aslider">
-        <div class="slider_header">Learning rate:</div>
+        <div class="slider_header">Learning rate: you want to anneal this over time if you're training for longer time.</div>
         <div class="theslider" id="lr_slider"></div>
         <div class="slider_value" id="lr_text"></div>
       </div>
@@ -1963,7 +1975,7 @@ clipval = 5.0; // clip gradients at this value
     <div class="hh">Model samples:</div>
     <div id="controls">
       <div class="aslider">
-        <div class="slider_header">Softmax sample temperature (low = more peaky predictions)</div>
+        <div class="slider_header">Softmax sample temperature: lower setting will generate more likely predictions, but you'll see more of the same common words again and again. Higher setting will generate less frequent words but you might see more spelling errors.</div>
         <div class="theslider" id="temperature_slider"></div>
         <div class="slider_value" id="temperature_text"></div>
       </div>
@@ -1973,15 +1985,18 @@ clipval = 5.0; // clip gradients at this value
     <div id="argmax"></div>
   </div>
   <div id="io">
-    <h2>I/O save/load model JSON</h2>
+    <div class="hh">I/O save/load model JSON</div>
+
     <button id="savemodel" class="abutton">save model</button>
     <button id="loadmodel" class="abutton">load model</button>
     <div>
-      The textarea below is pre-filled with an example pre-trained model. You can choose to load it to see what predictions later on in training look like.
+      You can save or load models with JSON using the textarea below.
     </div>
     <textarea style="width:100%; height:200px;" id="tio"></textarea>
 
-    You can also load an example pretrained model:
+    <br>
+    <div class="hh">Pretrained model:</div>
+    You can also choose to load an example pretrained model with the button below to see what the predictions look like in later stages. The pretrained model is an LSTM with one layer of 100 units, trained for ~10 hours. After clicking button below you should see the perplexity plummet to about 3.0, and see the predictions become better.<br>
     <button id="loadpretrained" class="abutton">load pretrained</button>
 
   </div>
