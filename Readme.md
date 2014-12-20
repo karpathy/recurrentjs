@@ -9,7 +9,7 @@ RecurrentJS is a Javascript library that implements:
 
 ## Online demo
 
-An online demo that memorizes character seqeunces can be found below. Sentences are input data and the networks are trained to predict the next character in a sentence. Thus, they learn English from scratch character by character and eventually after some training generate entirely new sentences that sometimes make some sense :)
+An online demo that memorizes character sequences can be found below. Sentences are input data and the networks are trained to predict the next character in a sentence. Thus, they learn English from scratch character by character and eventually after some training generate entirely new sentences that sometimes make some sense :)
 
 [Character Sequence Memorization Demo](http://cs.stanford.edu/people/karpathy/recurrentjs)
 
