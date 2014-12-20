@@ -5,17 +5,17 @@ RecurrentJS is a Javascript library that implements:
 
 - Deep **Recurrent Neural Networks** (RNN) 
 - **Long Short-Term Memory networks** (LSTM) 
-- In fact, the library is much more general because it has functionality to construct arbitrary **expression graphs** and then the library performs **automatic symbolic differentiation** similar to what you may find in Theano for Python, or in Torch etc. Currently, the code uses this very general functionality to implement RNN/LSTM, but one can build arbitrary Neural Networks and do automatic backprop.
+- In fact, the library is more general because it has functionality to construct arbitrary **expression graphs** over which the library can perform **automatic differentiation** similar to what you may find in Theano for Python, or in Torch etc. Currently, the code uses this very general functionality to implement RNN/LSTM, but one can build arbitrary Neural Networks and do automatic backprop.
 
 ## Online demo
 
-An online demo that memorizes character seqeunces can be found below. Sentences are input data and the networks are trained to predict the next character in a sentence. Thus, they learn English from scratch character by character and eventually after some training generate entirely new sentences that sometimes make some sense :)
+An online demo that memorizes character sequences can be found below. Sentences are input data and the networks are trained to predict the next character in a sentence. Thus, they learn English from scratch character by character and eventually after some training generate entirely new sentences that sometimes make some sense :)
 
 [Character Sequence Memorization Demo](http://cs.stanford.edu/people/karpathy/recurrentjs)
 
 ## Example code
 
-The core of the library is a **Graph** structure which maintains the symbolic links between matrices and how they are related through transformations. Another important building block is the **Mat** class which represents a 2-dimensional `N x D` matrix, its values in field `.w` and its derivates in field `.dw`. Here is how you would implement a simple Neural Network layer:
+The core of the library is a **Graph** structure which maintains the links between matrices and how they are related through transformations. Another important building block is the **Mat** class which represents a 2-dimensional `N x D` matrix, its values in field `.w` and its derivates in field `.dw`. Here is how you would implement a simple Neural Network layer:
 
 ```javascript
 
@@ -29,7 +29,7 @@ var h = G.add(G.mul(W, x), b);
 // the Graph structure keeps track of the connectivities between Mats
 
 // we can now set the loss on h
-h.dw[0] = 1.0; // say we want the first value to be higher
+h.dw[0] = 1.0; // say we want the first value to be lower
 
 // propagate all gradients backwards through the graph
 // starting with h, all the way down to W,x,b
@@ -40,7 +40,8 @@ G.backward();
 var s = R.Solver(); // the Solver uses RMSProp
 // update W and b, use learning rate of 0.01, 
 // regularization strength of 0.0001 and clip gradient magnitudes at 5.0
-s.step({'W':W, 'b':b}, 0.01, 0.0001, 5.0)
+var model = {'W':W, 'b':b};
+s.step(model, 0.01, 0.0001, 5.0)
 ```
 
 To construct and train an LSTM for example, you would proceed as follows:
