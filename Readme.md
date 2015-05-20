@@ -37,7 +37,7 @@ h.dw[0] = 1.0; // say we want the first value to be lower
 G.backward();
 
 // do a parameter update on W,b:
-var s = R.Solver(); // the Solver uses RMSProp
+var s = new R.Solver(); // the Solver uses RMSProp
 // update W and b, use learning rate of 0.01, 
 // regularization strength of 0.0001 and clip gradient magnitudes at 5.0
 var model = {'W':W, 'b':b};
@@ -83,7 +83,7 @@ out1.dw[ix_target] -= 1;
 
 // update the LSTM parameters
 G.backward();
-var s = R.Solver();
+var s = new R.Solver();
 
 // perform RMSprop update with
 // step size of 0.01
