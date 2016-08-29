@@ -1,6 +1,6 @@
 <html>
 <head>
-<title>RecurrentJS Sentence Memorization Demo</title>
+<title>RecurrentJS Math Demo</title>
 
 <style>
 body {
@@ -84,17 +84,17 @@ body {
 
 
 <div id="wrap">
-  <h1>Deep Recurrent Nets character generation demo</h1>
+  <h1>Deep Recurrent Nets math demo</h1>
   <div id="intro">
     This demo shows usage of the <a href="https://github.com/karpathy/recurrentjs">recurrentjs library</a> that allows you to train deep Recurrent Neural Networks (RNN) and Long Short-Term Memory Networks (LSTM) in Javascript. But the core of the library is more general and allows you to set up arbitrary expression graphs that support fully automatic backpropagation.<br><br>
 
-    In this demo we take a dataset of sentences as input and learn to memorize the sentences character by character. That is, the RNN/LSTM takes a character, its context from previous time steps (as mediated by the hidden layers) and predicts the next character in the sequence. Here is an example: <br><br>
+    In this demo we take a dataset of random math characters as input and learn to memorize the math logic character by character. That is, the RNN/LSTM takes a character, its context from previous time steps (as mediated by the hidden layers) and predicts the next character in the sequence. Here is an example: <br><br>
 
     <div style="text-align:center;"><img src="eg.png"></div>
 
     In the example image above that depicts a deep RNN, every character has an associated "letter vector" that we will train with backpropagation. These letter vectors are combined through a (learnable) Matrix-vector multiply transformation into the first hidden layer representation (yellow), then into second hidden layer representation (purple), and finally into the output space (blue). The output space has dimensionality equal to the number of characters in the dataset and every dimension provides the probability of the next character in the sequence. The network is therefore trained to always predict the next character (using Softmax + cross-entropy loss on all letters). The quantity we track during training is called the <b>perplexity</b>, which measures how surprised the network is to see the next character in a sequence. For example, if perplexity is 4.0 then it's as if the network was guessing uniformly at random from 4 possible characters for next letter (i.e. lowest it can be is 1). At test time, the prediction is currently done iteratively character by character in a greedy fashion, but I might eventually implemented more sophisticated methods (e.g. beam search).<br><br>
 
-    The demo is pre-filled with sentences from <a href="http://www.paulgraham.com/articles.html">Paul Graham's essays</a>, in an attempt to encode Paul Graham's knowledge into the weights of the Recurrent Networks. The long-term goal of the project then is to generate startup wisdom at will. Feel free to train on whatever data you wish, and to experiment with the parameters. If you want more impressive models you have to increase the sizes of hidden layers, and maybe slightly the letter vectors. However, this will take longer to train.<br><br>
+    The demo is populated with random math from javascript.<br><br>
 
     For suggestions/bugs ping me at <a href="https://twitter.com/karpathy">@karpathy</a>.<br><br>
 
