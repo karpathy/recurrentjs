@@ -101,7 +101,10 @@ body {
   </div>
   <div>
     <div class="hh">Input sentences:</div>
-    <textarea style="width:100%; height:200px;" id="ti"></textarea>
+    <textarea style="width:100%; height:200px;" id="ti">000
+011
+100
+110</textarea>
   </div>
   <div id="prepro_status"></div>
 
@@ -113,9 +116,9 @@ body {
   <textarea id="newnet" style="width:100%; height:200px;">
 
 // model parameters
-generator = 'lstm'; // can be 'rnn' or 'lstm'
-hidden_sizes = [20,20]; // list of sizes of hidden layers
-letter_size = 6; // size of letter embeddings
+generator = 'rnn'; // can be 'rnn' or 'lstm'
+hidden_sizes = [3]; // list of sizes of hidden layers
+letter_size = 3; // size of letter embeddings
 
 // optimization
 regc = 0.000001; // L2 regularization strength
@@ -190,23 +193,6 @@ clipval = 5.0; // clip gradients at this value
 
     return array;
   }
-
-  function build() {
-    var items = [];
-    for (var i = 0; i <= 10; i++) {
-      for (var j = 0; j <= 10; j++) {
-        items.push(i + '+' + j + '=' + (i + j));
-        if (i === j) continue;
-        items.push(j + '+' + i + '=' + (i + j));
-      }
-    }
-    items.random = function() {
-      return items[Math.floor(Math.random() * items.length)];
-    };
-    return shuffle(items);
-  }
-  var inputs = build();
-  document.getElementById('ti').innerHTML = inputs.join('\n');
 
   // prediction params
   var sample_softmax_temperature = 1.0; // how peaky model predictions should be
