@@ -77,9 +77,13 @@ body {
 
 <script src="src/recurrent.js"></script>
 <script src="src/vis.js"></script>
+<script src="node_modules/three/build/three.min.js"></script>
+<script src="node_modules/three/examples/js/controls/OrbitControls.js"></script>
+<script src="rnn-viewer.js"></script>
 </head>
 
 <body>
+<div id="container"></div>
 <a href="https://github.com/karpathy/recurrentjs"><img style="position: absolute; top: 0; right: 0; border: 0;" src="https://s3.amazonaws.com/github/ribbons/forkme_right_darkblue_121621.png" alt="Fork me on GitHub"></a>
 
 
@@ -113,7 +117,7 @@ body {
   <textarea id="newnet" style="width:100%; height:200px;">
 
 // model parameters
-generator = 'lstm'; // can be 'rnn' or 'lstm'
+generator = 'rnn'; // can be 'rnn' or 'lstm'
 hidden_sizes = [20,20]; // list of sizes of hidden layers
 letter_size = 6; // size of letter embeddings
 
@@ -631,6 +635,85 @@ clipval = 5.0; // clip gradients at this value
     });
   });
 
+</script>
+
+<script>
+  function adaptMatrix(old) {
+    old.rows = old.n;
+    old.columns = old.d;
+    old.__defineGetter__('weights', function() {
+      return old.w;
+    });
+    old.__defineGetter__('recurrence', function() {
+      return old.dw;
+    });
+    return old;
+  }
+  setTimeout(function() {
+    var rnnViewer = new RNNViewer({
+      container: document.getElementById('container')
+    })
+        .addMatrix(adaptMatrix(model['Wil']));
+
+
+      for (var d = 0; d < hidden_sizes.length; d++) {
+        if (generator === 'lstm') {
+          rnnViewer
+              .addMatrix(adaptMatrix(model['Wix' + d]))
+              .addMatrix(adaptMatrix(model['Wih' + d]))
+              .addMatrix(adaptMatrix(model['bi' + d]))
+              .addMatrix(adaptMatrix(model['Wfx' + d]))
+              .addMatrix(adaptMatrix(model['Wfh' + d]))
+              .addMatrix(adaptMatrix(model['bf' + d]))
+              .addMatrix(adaptMatrix(model['Wox' + d]))
+              .addMatrix(adaptMatrix(model['Woh' + d]))
+              .addMatrix(adaptMatrix(model['bo' + d]))
+              // cell write params
+              .addMatrix(adaptMatrix(model['Wcx' + d]))
+              .addMatrix(adaptMatrix(model['Wch' + d]))
+              .addMatrix(adaptMatrix(model['bc' + d]));
+        } else {
+          rnnViewer
+              .addMatrix(adaptMatrix(model['Wxh' + d]))
+              .addMatrix(adaptMatrix(model['Whh' + d]))
+              .addMatrix(adaptMatrix(model['bhh' + d]));
+        }
+      }
+
+        rnnViewer
+        // decoder params
+        .addMatrix(adaptMatrix(model['Whd']))
+        .addMatrix(adaptMatrix(model['bd']))
+        .render();
+
+    setInterval(function() {
+      var coldColor = rnnViewer.coldColor,
+          hotColor = rnnViewer.hotColor;
+
+      rnnViewer.values.forEach(function(value) {
+        var v = value.percentValue,
+            r = (coldColor.r + hotColor.r) / v,
+            g = (coldColor.g + hotColor.g) / v,
+            b = (coldColor.b + hotColor.b) / v;
+
+        value.frontFace.color.setRGB(
+            r,
+            g,
+            b
+        );
+        value.rearFace.color.setRGB(
+            r,
+            g,
+            b
+        );
+        value.square.colorsNeedUpdate = true;
+        //value.mesh.geometry.elementsNeedUpdate = true;
+        value.mesh.geometry.colorsNeedUpdate = true;
+      });
+
+      rnnViewer.render();
+    }, 200);
+  }, 1000);
 </script>
 </body>
 </html>

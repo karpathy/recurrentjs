@@ -506,7 +506,6 @@ var R = {}; // the Recurrent library
       var hidden_size = hidden_sizes[d];
       model['Wxh' + d] = new R.RandMat(hidden_size, prev_size, 0, 0.08);
       model['Whh' + d] = new R.RandMat(hidden_size, hidden_size, 0, 0.08);
-      model['Whh' + d].is = true;
       model['bhh' + d] = new R.Mat(hidden_size, 1);
     }
     // decoder params
