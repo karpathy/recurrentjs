@@ -1,0 +1,704 @@
+<html>
+<head>
+<title>RecurrentJS Math Demo</title>
+
+<style>
+body {
+  font-family: Arial, "Helvetica Neue", Helvetica, sans-serif;
+  color: #333;
+  padding: 20px;
+}
+#argmax {
+  background-color: #DFD;
+}
+#ppl {
+  color: #090;
+  font-size: 20px;
+}
+#epoch {
+  color: #900;
+  font-size: 20px;
+}
+.apred {
+  padding: 2px;
+  margin: 5px;
+  overflow: hidden;
+  height: 20px;
+  font-size: 14px;
+}
+#prepro_status {
+  background-color: #FFD;
+  padding: 5px;
+}
+#status {
+  padding: 2px;
+  margin-top: 5px;
+}
+#controls {
+  margin: 5px;
+}
+.theslider {
+  width:90%;
+  display: inline-block;
+}
+.slider_value {
+  width: 9%;
+  display: inline-block;
+}
+#wrap {
+  width: 800px;
+  margin-right: auto;
+  margin-left: auto;
+  margin-bottom: 200px;
+}
+.abutton {
+  width: 120px;
+  height: 30px;
+  margin: 10px 10px 10px 0px;
+}
+.hh {
+  background-color: #EEE;
+  padding: 5px;
+  margin-top: 5px;
+  border-bottom: 1px solid #999;
+  margin-bottom: 2px;
+}
+#pplgraph {
+  float: right;
+}
+#intro {
+  text-align: justify;
+}
+</style>
+<link href="external/jquery-ui.min.css" rel="stylesheet">
+
+<script src="external/jquery-1.8.3.min.js"></script>
+<script src="external/jquery-ui.min.js"></script>
+
+<script src="src/recurrent.js"></script>
+<script src="src/vis.js"></script>
+<script src="node_modules/three/build/three.min.js"></script>
+<script src="node_modules/three/examples/js/controls/OrbitControls.js"></script>
+<script src="rnn-viewer.js"></script>
+</head>
+
+<body>
+<div id="container"></div>
+<a href="https://github.com/karpathy/recurrentjs"><img style="position: absolute; top: 0; right: 0; border: 0;" src="https://s3.amazonaws.com/github/ribbons/forkme_right_darkblue_121621.png" alt="Fork me on GitHub"></a>
+
+
+<div id="wrap">
+  <h1>Deep Recurrent Nets math demo</h1>
+  <div id="intro">
+    This demo shows usage of the <a href="https://github.com/karpathy/recurrentjs">recurrentjs library</a> that allows you to train deep Recurrent Neural Networks (RNN) and Long Short-Term Memory Networks (LSTM) in Javascript. But the core of the library is more general and allows you to set up arbitrary expression graphs that support fully automatic backpropagation.<br><br>
+
+    In this demo we take a dataset of random math characters as input and learn to memorize the math logic character by character. That is, the RNN/LSTM takes a character, its context from previous time steps (as mediated by the hidden layers) and predicts the next character in the sequence. Here is an example: <br><br>
+
+    <div style="text-align:center;"><img src="eg.png"></div>
+
+    In the example image above that depicts a deep RNN, every character has an associated "letter vector" that we will train with backpropagation. These letter vectors are combined through a (learnable) Matrix-vector multiply transformation into the first hidden layer representation (yellow), then into second hidden layer representation (purple), and finally into the output space (blue). The output space has dimensionality equal to the number of characters in the dataset and every dimension provides the probability of the next character in the sequence. The network is therefore trained to always predict the next character (using Softmax + cross-entropy loss on all letters). The quantity we track during training is called the <b>perplexity</b>, which measures how surprised the network is to see the next character in a sequence. For example, if perplexity is 4.0 then it's as if the network was guessing uniformly at random from 4 possible characters for next letter (i.e. lowest it can be is 1). At test time, the prediction is currently done iteratively character by character in a greedy fashion, but I might eventually implemented more sophisticated methods (e.g. beam search).<br><br>
+
+    The demo is populated with random math from javascript.<br><br>
+
+    For suggestions/bugs ping me at <a href="https://twitter.com/karpathy">@karpathy</a>.<br><br>
+
+  </div>
+  <div>
+    <div class="hh">Input sentences:</div>
+    <textarea style="width:100%; height:200px;" id="ti">000
+011
+100
+110</textarea>
+  </div>
+  <div id="prepro_status"></div>
+
+  <div class="hh">Controls/Options:</div>
+  <button id="learn" class="abutton">learn/restart</button>
+  <button id="resume" class="abutton">resume</button>
+  <button id="stop" class="abutton">pause</button>
+  <!-- <button id="gradcheck">gradcheck</button> -->
+  <textarea id="newnet" style="width:100%; height:200px;">
+
+// model parameters
+generator = 'rnn'; // can be 'rnn' or 'lstm'
+hidden_sizes = [3]; // list of sizes of hidden layers
+letter_size = 3; // size of letter embeddings
+
+// optimization
+regc = 0.000001; // L2 regularization strength
+learning_rate = 0.01; // learning rate
+clipval = 5.0; // clip gradients at this value
+  </textarea><br />
+  protip: if your perplexity is exploding with Infinity try lowering the initial learning rate
+  <br>
+  <div id="status">
+
+    <div>
+      <div class="hh">Training stats:</div>
+      <div class="aslider">
+        <div class="slider_header">Learning rate: you want to anneal this over time if you're training for longer time.</div>
+        <div class="theslider" id="lr_slider"></div>
+        <div class="slider_value" id="lr_text"></div>
+      </div>
+
+      <canvas id="pplgraph"></canvas>
+      <div id="ticktime"></div>
+      <div id="gradclip"></div>
+      <div id="epoch"></div>
+      <div id="ppl"></div>
+
+      <div style="clear:both;"></div>
+    </div>
+
+    <div class="hh">Model samples:</div>
+    <div id="controls">
+      <div class="aslider">
+        <div class="slider_header">Softmax sample temperature: lower setting will generate more likely predictions, but you'll see more of the same common words again and again. Higher setting will generate less frequent words but you might see more spelling errors.</div>
+        <div class="theslider" id="temperature_slider"></div>
+        <div class="slider_value" id="temperature_text"></div>
+      </div>
+    </div>
+    <div id="samples"></div>
+    <div class="hh">Greedy argmax prediction:</div>
+    <div id="argmax"></div>
+  </div>
+  <div id="io">
+    <div class="hh">I/O save/load model JSON</div>
+
+    <button id="savemodel" class="abutton">save model</button>
+    <button id="loadmodel" class="abutton">load model</button>
+    <div>
+      You can save or load models with JSON using the textarea below.
+    </div>
+    <textarea style="width:100%; height:200px;" id="tio"></textarea>
+
+    <br>
+    <div class="hh">Pretrained model:</div>
+    You can also choose to load an example pretrained model with the button below to see what the predictions look like in later stages. The pretrained model is an LSTM with one layer of 100 units, trained for ~10 hours. After clicking button below you should see the perplexity plummet to about 3.0, and see the predictions become better.<br>
+    <button id="loadpretrained" class="abutton">load pretrained</button>
+
+  </div>
+</div>
+<script type="text/javascript">
+  function shuffle(array) {
+    var currentIndex = array.length, temporaryValue, randomIndex;
+
+    // While there remain elements to shuffle...
+    while (0 !== currentIndex) {
+      // Pick a remaining element...
+      randomIndex = Math.floor(Math.random() * currentIndex);
+      currentIndex -= 1;
+
+      // And swap it with the current element.
+      temporaryValue = array[currentIndex];
+      array[currentIndex] = array[randomIndex];
+      array[randomIndex] = temporaryValue;
+    }
+
+    return array;
+  }
+
+  // prediction params
+  var sample_softmax_temperature = 1.0; // how peaky model predictions should be
+  var max_chars_gen = 100; // max length of generated sentences
+
+  // various global var inits
+  var epoch_size = -1;
+  var input_size = -1;
+  var output_size = -1;
+  var letterToIndex = {};
+  var indexToLetter = {};
+  var vocab = [];
+  var data_sents = [];
+  var solver = new R.Solver(); // should be class because it needs memory for step caches
+  var pplGraph = new Rvis.Graph();
+
+  var model = {};
+
+  var initVocab = function(sents, count_threshold) {
+    // go over all characters and keep track of all unique ones seen
+    var txt = sents.join(''); // concat all
+
+    // count up all characters
+    var d = {};
+    for(var i=0,n=txt.length;i<n;i++) {
+      var txti = txt[i];
+      if(txti in d) { d[txti] += 1; }
+      else { d[txti] = 1; }
+    }
+
+    // filter by count threshold and create pointers
+    letterToIndex = {};
+    indexToLetter = {};
+    vocab = [];
+    // NOTE: start at one because we will have START and END tokens!
+    // that is, START token will be index 0 in model letter vectors
+    // and END token will be index 0 in the next character softmax
+    var q = 1;
+    for(ch in d) {
+      if(d.hasOwnProperty(ch)) {
+        if(d[ch] >= count_threshold) {
+          // add character to vocab
+          letterToIndex[ch] = q;
+          indexToLetter[q] = ch;
+          vocab.push(ch);
+          q++;
+        }
+      }
+    }
+
+    // globals written: indexToLetter, letterToIndex, vocab (list), and:
+    input_size = vocab.length + 1;
+    output_size = vocab.length + 1;
+    epoch_size = sents.length;
+    $("#prepro_status").text('found ' + vocab.length + ' distinct characters: ' + vocab.join(''));
+  };
+
+  var utilAddToModel = function(modelto, modelfrom) {
+    for(var k in modelfrom) {
+      if(modelfrom.hasOwnProperty(k)) {
+        // copy over the pointer but change the key to use the append
+        modelto[k] = modelfrom[k];
+      }
+    }
+  };
+
+  var initModel = function() {
+    // letter embedding vectors
+    var model = {};
+    model['Wil'] = new R.RandMat(input_size, letter_size , 0, 0.08);
+
+    if(generator === 'rnn') {
+      var rnn = R.initRNN(letter_size, hidden_sizes, output_size);
+      utilAddToModel(model, rnn);
+    } else {
+      var lstm = R.initLSTM(letter_size, hidden_sizes, output_size);
+      utilAddToModel(model, lstm);
+    }
+
+    return model;
+  };
+
+  var reinit_learning_rate_slider = function() {
+    // init learning rate slider for controlling the decay
+    // note that learning_rate is a global variable
+    $("#lr_slider").slider({
+      min: Math.log10(0.01) - 3.0,
+      max: Math.log10(0.01) + 0.05,
+      step: 0.05,
+      value: Math.log10(learning_rate),
+      slide: function( event, ui ) {
+        learning_rate = Math.pow(10, ui.value);
+        $("#lr_text").text(learning_rate.toFixed(5));
+      }
+    });
+    $("#lr_text").text(learning_rate.toFixed(5));
+  };
+
+  var reinit = function() {
+    // note: reinit writes global vars
+
+    // eval options to set some globals
+    eval($("#newnet").val());
+
+    reinit_learning_rate_slider();
+
+    solver = new R.Solver(); // reinit solver
+    pplGraph = new Rvis.Graph();
+
+    ppl_list = [];
+    tick_iter = 0;
+
+    // process the input, filter out blanks
+    var data_sents_raw = $('#ti').val().split('\n');
+    data_sents = [];
+    for(var i=0;i<data_sents_raw.length;i++) {
+      var sent = data_sents_raw[i].trim();
+      if(sent.length > 0) {
+        data_sents.push(sent);
+      }
+    }
+
+    initVocab(data_sents, 1); // takes count threshold for characters
+    model = initModel();
+  };
+
+  var saveModel = function() {
+    var out = {};
+    out['hidden_sizes'] = hidden_sizes;
+    out['generator'] = generator;
+    out['letter_size'] = letter_size;
+    var model_out = {};
+    for(var k in model) {
+      if(model.hasOwnProperty(k)) {
+        model_out[k] = model[k].toJSON();
+      }
+    }
+    out['model'] = model_out;
+    var solver_out = {};
+    solver_out['decay_rate'] = solver.decay_rate;
+    solver_out['smooth_eps'] = solver.smooth_eps;
+    var step_cache_out = {};
+    for(k in solver.step_cache) {
+      if(solver.step_cache.hasOwnProperty(k)) {
+        step_cache_out[k] = solver.step_cache[k].toJSON();
+      }
+    }
+    solver_out['step_cache'] = step_cache_out;
+    out['solver'] = solver_out;
+    out['letterToIndex'] = letterToIndex;
+    out['indexToLetter'] = indexToLetter;
+    out['vocab'] = vocab;
+    return JSON.stringify(out);
+  };
+
+  var hidden_sizes;
+  var generator;
+  var letter_size;
+  var learning_rate;
+
+  var loadModel = function(j) {
+    hidden_sizes = j.hidden_sizes;
+    generator = j.generator;
+    letter_size = j.letter_size;
+    model = {};
+    for(var k in j.model) {
+      if(j.model.hasOwnProperty(k)) {
+        var matjson = j.model[k];
+        model[k] = new R.Mat(1,1);
+        model[k].fromJSON(matjson);
+      }
+    }
+    solver = new R.Solver(); // have to reinit the solver since model changed
+    solver.decay_rate = j.solver.decay_rate;
+    solver.smooth_eps = j.solver.smooth_eps;
+    solver.step_cache = {};
+    for(k in j.solver.step_cache){
+      if(j.solver.step_cache.hasOwnProperty(k)){
+        matjson = j.solver.step_cache[k];
+        solver.step_cache[k] = new R.Mat(1,1);
+        solver.step_cache[k].fromJSON(matjson);
+      }
+    }
+    letterToIndex = j['letterToIndex'];
+    indexToLetter = j['indexToLetter'];
+    vocab = j['vocab'];
+
+    // reinit these
+    ppl_list = [];
+    tick_iter = 0;
+  };
+
+  var forwardIndex = function(G, model, ix, prev) {
+    var x = G.rowPluck(model['Wil'], ix);
+    // forward prop the sequence learner
+    if(generator === 'rnn') {
+      return R.forwardRNN(G, model, hidden_sizes, x, prev);
+    } else {
+      return R.forwardLSTM(G, model, hidden_sizes, x, prev);
+    }
+  };
+
+  var predictSentence = function(model, samplei, temperature) {
+    if(typeof samplei === 'undefined') { samplei = false; }
+    if(typeof temperature === 'undefined') { temperature = 1.0; }
+
+    var G = new R.Graph(false);
+    var s = '';
+    var prev = {};
+    while(true) {
+
+      // RNN tick
+      var ix = s.length === 0 ? 0 : letterToIndex[s[s.length-1]];
+      var lh = forwardIndex(G, model, ix, prev);
+      prev = lh;
+
+      // sample predicted letter
+      var logprobs = lh.o;
+      if(temperature !== 1.0 && samplei) {
+        // scale log probabilities by temperature and renormalize
+        // if temperature is high, logprobs will go towards zero
+        // and the softmax outputs will be more diffuse. if temperature is
+        // very low, the softmax outputs will be more peaky
+        for(var q=0,nq=logprobs.w.length;q<nq;q++) {
+          logprobs.w[q] /= temperature;
+        }
+      }
+
+      var probs = R.softmax(logprobs);
+      if(samplei) {
+        ix = R.samplei(probs.w);
+      } else {
+        ix = R.maxi(probs.w);
+      }
+
+      if(ix === 0) break; // END token predicted, break out
+      if(s.length > max_chars_gen) { break; } // something is wrong
+
+      var letter = indexToLetter[ix];
+      s += letter;
+    }
+    return s;
+  };
+
+  var costfun = function(model, sent) {
+    // takes a model and a sentence and
+    // calculates the loss. Also returns the Graph
+    // object which can be used to do backprop
+    var n = sent.length;
+    var G = new R.Graph();
+    var log2ppl = 0.0;
+    var cost = 0.0;
+    var prev = {};
+    for(var i=-1;i<n;i++) {
+      // start and end tokens are zeros
+      var ix_source = i === -1 ? 0 : letterToIndex[sent[i]]; // first step: start with START token
+      var ix_target = i === n-1 ? 0 : letterToIndex[sent[i+1]]; // last step: end with END token
+
+      var lh = forwardIndex(G, model, ix_source, prev);
+      prev = lh;
+
+      // set gradients into logprobabilities
+      var logprobs = lh.o; // interpret output as logprobs
+      var probs = R.softmax(logprobs); // compute the softmax probabilities
+
+      log2ppl += -Math.log2(probs.w[ix_target]); // accumulate base 2 log prob and do smoothing
+      cost += -Math.log(probs.w[ix_target]);
+
+      // write gradients into log probabilities
+      logprobs.dw = probs.w;
+      logprobs.dw[ix_target] -= 1
+    }
+    var ppl = Math.pow(2, log2ppl / (n - 1));
+    return {'G':G, 'ppl':ppl, 'cost':cost};
+  };
+
+  function median(values) {
+    values.sort( function(a,b) {return a - b;} );
+    var half = Math.floor(values.length/2);
+    if(values.length % 2) return values[half];
+    else return (values[half-1] + values[half]) / 2.0;
+  }
+
+  var ppl_list = [];
+  var tick_iter = 0;
+  var tick = function() {
+
+    // sample sentence fromd data
+    var sentix = R.randi(0,data_sents.length);
+    var sent = data_sents[sentix];
+
+    var t0 = +new Date();  // log start timestamp
+
+    // evaluate cost function on a sentence
+    var cost_struct = costfun(model, sent);
+
+    // use built up graph to compute backprop (set .dw fields in mats)
+    cost_struct.G.backward();
+
+    // perform param update
+    var solver_stats = solver.step(model, learning_rate, regc, clipval);
+    //$("#gradclip").text('grad clipped ratio: ' + solver_stats.ratio_clipped)
+
+    var t1 = +new Date();
+    var tick_time = t1 - t0;
+
+    ppl_list.push(cost_struct.ppl); // keep track of perplexity
+
+    // evaluate now and then
+    tick_iter += 1;
+    if(tick_iter % 50 === 0) {
+      // draw samples
+      $('#samples').html('');
+      for(var q=0;q<5;q++) {
+        var pred = predictSentence(model, true, sample_softmax_temperature);
+        var pred_div = '<div class="apred">'+pred+'</div>'
+        $('#samples').append(pred_div);
+      }
+    }
+    if(tick_iter % 10 === 0) {
+      // draw argmax prediction
+      $('#argmax').html('');
+      var pred = predictSentence(model, false);
+      var pred_div = '<div class="apred">'+pred+'</div>'
+      $('#argmax').append(pred_div);
+
+      // keep track of perplexity
+      $('#epoch').text('epoch: ' + (tick_iter/epoch_size).toFixed(2));
+      $('#ppl').text('perplexity: ' + cost_struct.ppl.toFixed(2));
+      $('#ticktime').text('forw/bwd time per example: ' + tick_time.toFixed(1) + 'ms');
+
+      if(tick_iter % 100 === 0) {
+        var median_ppl = median(ppl_list);
+        ppl_list = [];
+        pplGraph.add(tick_iter, median_ppl);
+        pplGraph.drawSelf(document.getElementById("pplgraph"));
+      }
+    }
+  };
+
+  var gradCheck = function() {
+    var model = initModel();
+    var sent = '^test sentence$';
+    var cost_struct = costfun(model, sent);
+    cost_struct.G.backward();
+    var eps = 0.000001;
+
+    for(var k in model) {
+      if(model.hasOwnProperty(k)) {
+        var m = model[k]; // mat ref
+        for(var i=0,n=m.w.length;i<n;i++) {
+
+          oldval = m.w[i];
+          m.w[i] = oldval + eps;
+          var c0 = costfun(model, sent);
+          m.w[i] = oldval - eps;
+          var c1 = costfun(model, sent);
+          m.w[i] = oldval;
+
+          var gnum = (c0.cost - c1.cost)/(2 * eps);
+          var ganal = m.dw[i];
+          var relerr = (gnum - ganal)/(Math.abs(gnum) + Math.abs(ganal));
+          if(relerr > 1e-1) {
+            console.log(k + ': numeric: ' + gnum + ', analytic: ' + ganal + ', err: ' + relerr);
+          }
+        }
+      }
+    }
+  };
+
+  var iid = null;
+  $(function() {
+
+    // attach button handlers
+    $('#learn').click(function(){
+      reinit();
+      if(iid !== null) { clearInterval(iid); }
+      iid = setInterval(tick, 0);
+      //iid = setTimeout(tick, 0);
+      //setTimeout(function() {
+        //console.log(saveModel());
+      //}, 1000);
+    });
+    $('#stop').click(function(){
+      if(iid !== null) { clearInterval(iid); }
+      iid = null;
+    });
+    $("#resume").click(function(){
+      if(iid === null) {
+        iid = setInterval(tick, 0);
+      }
+    });
+
+    $("#savemodel").click(saveModel);
+    $("#loadmodel").click(function(){
+      var j = JSON.parse($("#tio").val());
+      loadModel(j);
+    });
+
+    $("#loadpretrained").click(function(){
+      $.getJSON("lstm_100_model.json", function(data) {
+        pplGraph = new Rvis.Graph();
+        learning_rate = 0.0001;
+        reinit_learning_rate_slider();
+        loadModel(data);
+      });
+    });
+
+    $("#learn").click(); // simulate click on startup
+
+    //$('#gradcheck').click(gradCheck);
+
+    $("#temperature_slider").slider({
+      min: -1,
+      max: 1.05,
+      step: 0.05,
+      value: 0,
+      slide: function( event, ui ) {
+        sample_softmax_temperature = Math.pow(10, ui.value);
+        $("#temperature_text").text( sample_softmax_temperature.toFixed(2) );
+      }
+    });
+  });
+</script>
+
+<script>
+  function adaptMatrix(old) {
+    old.rows = old.n;
+    old.columns = old.d;
+    old.__defineGetter__('weights', function() {
+      return old.w;
+    });
+    old.__defineGetter__('recurrence', function() {
+      return old.dw;
+    });
+    return old;
+  }
+  setTimeout(function() {
+    var rnnViewer = new RNNViewer({
+      container: document.getElementById('container')
+    })
+        .addMatrix(adaptMatrix(model['Wil']));
+
+
+    for (var d = 0; d < hidden_sizes.length; d++) {
+      if (generator === 'lstm') {
+        rnnViewer
+            .addMatrix(adaptMatrix(model['Wix' + d]))
+            .addMatrix(adaptMatrix(model['Wih' + d]))
+            .addMatrix(adaptMatrix(model['bi' + d]))
+            .addMatrix(adaptMatrix(model['Wfx' + d]))
+            .addMatrix(adaptMatrix(model['Wfh' + d]))
+            .addMatrix(adaptMatrix(model['bf' + d]))
+            .addMatrix(adaptMatrix(model['Wox' + d]))
+            .addMatrix(adaptMatrix(model['Woh' + d]))
+            .addMatrix(adaptMatrix(model['bo' + d]))
+            // cell write params
+            .addMatrix(adaptMatrix(model['Wcx' + d]))
+            .addMatrix(adaptMatrix(model['Wch' + d]))
+            .addMatrix(adaptMatrix(model['bc' + d]));
+      } else {
+        rnnViewer
+            .addMatrix(adaptMatrix(model['Wxh' + d]))
+            .addMatrix(adaptMatrix(model['Whh' + d]))
+            .addMatrix(adaptMatrix(model['bhh' + d]));
+      }
+    }
+
+    rnnViewer
+    // decoder params
+        .addMatrix(adaptMatrix(model['Whd']))
+        .addMatrix(adaptMatrix(model['bd']))
+        .render();
+
+    setInterval(function() {
+      var coldColor = rnnViewer.coldColor,
+          hotColor = rnnViewer.hotColor;
+
+      rnnViewer.values.forEach(function(value) {
+        var v = value.percentValue * 100,
+            r = (coldColor.r + hotColor.r) / v,
+            g = (coldColor.g + hotColor.g) / v,
+            b = (coldColor.b + hotColor.b) / v;
+
+        value.frontFace.color.setRGB(
+            r,
+            g,
+            b
+        );
+        value.rearFace.color.setRGB(
+            r,
+            g,
+            b
+        );
+        value.square.colorsNeedUpdate = true;
+        //value.mesh.geometry.elementsNeedUpdate = true;
+        value.mesh.geometry.colorsNeedUpdate = true;
+      });
+
+      rnnViewer.render();
+    }, 200);
+  }, 1000);
+</script>
+</body>
+</html>
